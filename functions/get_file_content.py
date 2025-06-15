@@ -1,6 +1,6 @@
 import os
 
-def get_files_info(working_directory, directory=None):
+def get_file_content(working_directory, file_path):
 
     # get the absolute path of the directory : abspath or relative apth   
     def  get_directory_path(working_directory, file_path):
@@ -14,7 +14,6 @@ def get_files_info(working_directory, directory=None):
         file_type = check_dict["type"]
         print(f'- checking {path} - {file_type}')
         if os.path.exists(path):
-            print(f'{path} exists')
             if file_type == "file":
                 return os.path.isfile(path)
             elif file_type == "directory":
@@ -30,20 +29,25 @@ def get_files_info(working_directory, directory=None):
         file = os.path.abspath(file)
         return os.path.commonpath([working_directory, file]) != working_directory
 
-    
-    directory = get_directory_path(working_directory,directory)
-    # check existance of directory files
+
+    MAX_CHARS = 10000
+    file_path = get_directory_path(working_directory, file_path)
     check_list = [
         { 'path':working_directory, 'type':'directory'},
-        { 'path':directory, 'type':'directory'}
+        { 'path':file_path, 'type':'file'}
     ]
     for check in check_list:
         if check_exists(check):
             pass
         else:
             return f'Error: "{check["path"]}"not found or is not a {check["type"]}'
-
-    if out_of_dir(working_directory, directory):
-        return f'Error: Cannot list "{directory}" as it is outside the permitted working directory'
-    list_files = list(map(lambda x: f"-  {x}: file_size={os.path.getsize(os.path.join(directory, x))} bytes, is_dir={os.path.isdir(os.path.join(directory, x))}",os.listdir(directory)))
-    return '\n'.join([f'---  {directory}: ---']+list_files(directory)+['---  end  ---',''])
+    if out_of_dir(working_directory, file_path):
+        return f'Error: Cannot list "{file_path}" as it is outside the permitted working directory'
+    try:
+        with open(file_path, 'r') as file:
+            file_content = file.read(MAX_CHARS)
+        if len(file_content) == MAX_CHARS:
+            file_content += f'\n[...File "{file_path}" truncated at 10000 characters]'
+        return file_content
+    except Exception as e:
+        return f'Error: {e.strerror}'
