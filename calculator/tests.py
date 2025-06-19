@@ -2,6 +2,7 @@
 
 import unittest
 from pkg.calculator import Calculator
+import math
 
 
 class TestCalculator(unittest.TestCase):
@@ -43,6 +44,10 @@ class TestCalculator(unittest.TestCase):
     def test_not_enough_operands(self):
         with self.assertRaises(ValueError):
             self.calculator.evaluate("+ 3")
+
+    def test_division_by_zero(self):
+        result = self.calculator.evaluate("1 / 0")
+        self.assertTrue(math.isinf(result))
 
 
 if __name__ == "__main__":

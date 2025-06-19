@@ -1,49 +1,41 @@
 import os
+from google.genai import types
+
 
 def get_files_info(working_directory, directory=None):
-
-    # get the absolute path of the directory : abspath or relative apth   
-    def  get_directory_path(working_directory, file_path):
-        if file_path.startswith("/"):
-            return file_path
-        else:
-            return os.path.join(working_directory, file_path)
-
-    def check_exists(check_dict):
-        path = check_dict["path"]
-        file_type = check_dict["type"]
-        print(f'- checking {path} - {file_type}')
-        if os.path.exists(path):
-            print(f'{path} exists')
-            if file_type == "file":
-                return os.path.isfile(path)
-            elif file_type == "directory":
-                return os.path.isdir(path)
-            else:
-                return False
-        else:
-            return False
-        
-
-    def out_of_dir(working_directory, file):
-        working_directory = os.path.abspath(working_directory)
-        file = os.path.abspath(file)
-        return os.path.commonpath([working_directory, file]) != working_directory
-
-    
-    directory = get_directory_path(working_directory,directory)
-    # check existance of directory files
-    check_list = [
-        { 'path':working_directory, 'type':'directory'},
-        { 'path':directory, 'type':'directory'}
-    ]
-    for check in check_list:
-        if check_exists(check):
-            pass
-        else:
-            return f'Error: "{check["path"]}"not found or is not a {check["type"]}'
-
-    if out_of_dir(working_directory, directory):
+    abs_working_dir = os.path.abspath(working_directory)
+    target_dir = abs_working_dir
+    if directory:
+        target_dir = os.path.abspath(os.path.join(working_directory, directory))
+    if not target_dir.startswith(abs_working_dir):
         return f'Error: Cannot list "{directory}" as it is outside the permitted working directory'
-    list_files = list(map(lambda x: f"-  {x}: file_size={os.path.getsize(os.path.join(directory, x))} bytes, is_dir={os.path.isdir(os.path.join(directory, x))}",os.listdir(directory)))
-    return '\n'.join([f'---  {directory}: ---']+list_files(directory)+['---  end  ---',''])
+    if not os.path.isdir(target_dir):
+        return f'Error: "{directory}" is not a directory'
+    try:
+        files_info = []
+        for filename in os.listdir(target_dir):
+            filepath = os.path.join(target_dir, filename)
+            file_size = 0
+            is_dir = os.path.isdir(filepath)
+            file_size = os.path.getsize(filepath)
+            files_info.append(
+                f"- {filename}: file_size={file_size} bytes, is_dir={is_dir}"
+            )
+        return "\n".join(files_info)
+    except Exception as e:
+        return f"Error listing files: {e}"
+
+
+schema_get_files_info = types.FunctionDeclaration(
+    name="get_files_info",
+    description="Lists files in the specified directory along with their sizes, constrained to the working directory.",
+    parameters=types.Schema(
+        type=types.Type.OBJECT,
+        properties={
+            "directory": types.Schema(
+                type=types.Type.STRING,
+                description="The directory to list files from, relative to the working directory. If not provided, lists files in the working directory itself.",
+            ),
+        },
+    ),
+)

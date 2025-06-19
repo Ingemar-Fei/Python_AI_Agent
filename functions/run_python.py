@@ -1,62 +1,61 @@
 import os
-import re
 import subprocess
+from google.genai import types
 
-def run_python_file(working_directory, file_path):
-    
-    # get the absolute path of the directory : abspath or relative apth   
-    def  get_directory_path(working_directory, file_path):
-        if file_path.startswith("/"):
-            return file_path
-        else:
-            return os.path.abspath(os.path.join(working_directory, file_path))
 
-    def check_exists(check_dict):
-        path = check_dict["path"]+'/'+check_dict["name"]
-        file_type = check_dict["type"]
-        print(f'- checking {path} - {file_type}')
-        if os.path.exists(path):
-            print(f'{path} exists')
-            if file_type == "file":
-                return os.path.isfile(path)
-            elif file_type == "directory":
-                return os.path.isdir(path)
-            else:
-                return False
-        else:
-            return False
-        
-    def out_of_dir(working_directory, file_path):
-        working_directory = os.path.abspath(working_directory)
-        file = get_directory_path(working_directory, file_path)
-        print('checking out_of_dir:',working_directory,';',file)
-        return os.path.commonpath([working_directory, file]) != working_directory
-
-    if not file_path.endswith('.py'):
-        return  f'Error: "{file_path}" is not a Python file.'
-    check_list = [
-        { 'path':'.', 'name':working_directory, 'type':'directory'},
-        { 'path':working_directory, 'name':file_path, 'type':'file'}
-    ]
-    for check in check_list:
-        if check_exists(check):
-            pass
-        else:
-            return f'Error: {check["type"].title()} "{check["name"]}" not found'
-    if out_of_dir(working_directory, file_path):
-        return f'Error: Cannot execute "{file_path}" as it is outside'
-    
+def run_python_file(working_directory, file_path, args=None):
+    abs_working_dir = os.path.abspath(working_directory)
+    abs_file_path = os.path.abspath(os.path.join(working_directory, file_path))
+    if not abs_file_path.startswith(abs_working_dir):
+        return f'Error: Cannot execute "{file_path}" as it is outside the permitted working directory'
+    if not os.path.exists(abs_file_path):
+        return f'Error: File "{file_path}" not found.'
+    if not file_path.endswith(".py"):
+        return f'Error: "{file_path}" is not a Python file.'
     try:
-        run_res = subprocess.run(["python", file_path],timeout=30, cwd=working_directory, capture_output=True)
-        res = ''
-        if run_res.stdout:
-            res += f"STDOUT: {run_res.stdout.decode()}\n"
-        elif run_res.stderr:
-            res += f"STDERR: {run_res.stderr.decode()}\n"
-        else:
-            res += "No output produced\n"
-        if run_res.returncode != 0:
-            res += f"Process exited with code {run_res.returncode}\n"
-        return res
+        commands = ["python", abs_file_path]
+        if args:
+            commands.extend(args)
+        result = subprocess.run(
+            commands,
+            capture_output=True,
+            text=True,
+            timeout=30,
+            cwd=abs_working_dir,
+        )
+        output = []
+        if result.stdout:
+            output.append(f"STDOUT:\n{result.stdout}")
+        if result.stderr:
+            output.append(f"STDERR:\n{result.stderr}")
+
+        if result.returncode != 0:
+            output.append(f"Process exited with code {result.returncode}")
+
+        return "\n".join(output) if output else "No output produced."
     except Exception as e:
         return f"Error: executing Python file: {e}"
+
+
+schema_run_python_file = types.FunctionDeclaration(
+    name="run_python_file",
+    description="Executes a Python file within the working directory and returns the output from the interpreter.",
+    parameters=types.Schema(
+        type=types.Type.OBJECT,
+        properties={
+            "file_path": types.Schema(
+                type=types.Type.STRING,
+                description="Path to the Python file to execute, relative to the working directory.",
+            ),
+            "args": types.Schema(
+                type=types.Type.ARRAY,
+                items=types.Schema(
+                    type=types.Type.STRING,
+                    description="Optional arguments to pass to the Python file.",
+                ),
+                description="Optional arguments to pass to the Python file.",
+            ),
+        },
+        required=["file_path"],
+    ),
+)
